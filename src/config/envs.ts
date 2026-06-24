@@ -2,7 +2,7 @@ import 'dotenv/config';
 import * as joi from 'joi';
 
 interface EnvVars {
-  NATS_SERVER: string;
+  NATS_SERVICE: string;
   FIREBASE_SERVICE_ACCOUNT_PATH: string;
   ONESIGNAL_APP_ID: string;
   ONESIGNAL_REST_API_KEY: string;
@@ -11,7 +11,7 @@ interface EnvVars {
 }
 
 const envsSchema = joi.object({
-  NATS_SERVER: joi.string().required(),
+  NATS_SERVICE: joi.string().required(),
   FIREBASE_SERVICE_ACCOUNT_PATH: joi.string().default('./firebase-key.json'),
   ONESIGNAL_APP_ID: joi.string().allow('').optional(),
   ONESIGNAL_REST_API_KEY: joi.string().allow('').optional(),
@@ -29,7 +29,7 @@ if (error) {
 const envVars: EnvVars = value;
 
 export const envs = {
-  natsServer: envVars.NATS_SERVER,
+  natsServer: envVars.NATS_SERVICE,
   firebaseServiceAccountPath: envVars.FIREBASE_SERVICE_ACCOUNT_PATH,
   onesignalAppId: envVars.ONESIGNAL_APP_ID,
   onesignalRestApiKey: envVars.ONESIGNAL_REST_API_KEY,
