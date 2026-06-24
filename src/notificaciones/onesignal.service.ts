@@ -17,15 +17,7 @@ export class OnesignalService implements OnModuleInit {
 
     if (this.appId && restApiKey) {
       const configuration = OneSignal.createConfiguration({
-        authMethods: {
-          app_key: {
-            tokenProvider: {
-              getToken() {
-                return restApiKey;
-              }
-            }
-          }
-        }
+        restApiKey: restApiKey
       });
       this.client = new OneSignal.DefaultApi(configuration);
       this.isConfigured = true;
@@ -44,8 +36,8 @@ export class OnesignalService implements OnModuleInit {
     try {
       const notification = new OneSignal.Notification();
       notification.app_id = this.appId;
-      // Usamos include_external_user_ids para enviar a usuarios específicos del backend
-      notification.include_external_user_ids = usuarioIds; 
+      // Usamos include_aliases para enviar a usuarios específicos del backend (por external_id)
+      notification.include_aliases = { external_id: usuarioIds }; 
       notification.headings = { en: titulo, es: titulo };
       notification.contents = { en: mensaje, es: mensaje };
       

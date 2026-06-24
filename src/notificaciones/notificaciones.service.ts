@@ -57,8 +57,8 @@ export class NotificacionesService {
     const titulo = `¡Alerta en tu zona!`;
     const cuerpo = `Se ha detectado una anomalía: ${alerta.descripcion || alerta.tipo}. Mantén la calma y toma precauciones.`;
 
-    const records = [];
-    const operadoresIds = [];
+    const records: any[] = [];
+    const operadoresIds: string[] = [];
 
     // 3. Despachar notificaciones
     for (const u of usuarios) {
