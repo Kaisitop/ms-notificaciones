@@ -25,7 +25,7 @@ export class TelegramService {
         `[SIMULACIÓN TELEGRAM] A ChatID ${this.chatId || 'N/A'} -> ${titulo}: ${mensaje}`,
       );
       if (alertaId) {
-        this.logger.log(`[SIMULACIÓN] Botón mapa: ${this.dashboardUrl}/patrullaje-map?alerta=${alertaId}`);
+        this.logger.log(`[SIMULACIÓN] Botón mapa: ${this.dashboardUrl}/patrullaje?alerta=${alertaId}`);
       }
       return true;
     }
@@ -44,7 +44,7 @@ export class TelegramService {
             [
               {
                 text: '📍 Abrir Mapa / Atender Alerta',
-                url: `${this.dashboardUrl}/patrullaje-map?alerta=${alertaId}`,
+                url: `${this.dashboardUrl}/patrullaje?alerta=${alertaId}`,
               },
             ],
           ],
