@@ -2,6 +2,11 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { envs } from '../config';
 import * as OneSignal from '@onesignal/node-onesignal';
 
+export type WebPushPayload = {
+  alertaId?: string;
+  url?: string;
+};
+
 @Injectable()
 export class OnesignalService implements OnModuleInit {
   private readonly logger = new Logger(OnesignalService.name);
@@ -9,15 +14,13 @@ export class OnesignalService implements OnModuleInit {
   private appId: string;
   private isConfigured = false;
 
-  constructor() {}
-
   onModuleInit() {
     this.appId = envs.onesignalAppId;
     const restApiKey = envs.onesignalRestApiKey;
 
     if (this.appId && restApiKey) {
       const configuration = OneSignal.createConfiguration({
-        restApiKey: restApiKey
+        restApiKey: restApiKey,
       });
       this.client = new OneSignal.DefaultApi(configuration);
       this.isConfigured = true;
@@ -27,20 +30,41 @@ export class OnesignalService implements OnModuleInit {
     }
   }
 
-  async sendWebPush(usuarioIds: string[], titulo: string, mensaje: string): Promise<boolean> {
+  async sendWebPush(
+    usuarioIds: string[],
+    titulo: string,
+    mensaje: string,
+    payload?: WebPushPayload,
+  ): Promise<boolean> {
+    const uniqueIds = [...new Set(usuarioIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return false;
+
     if (!this.isConfigured) {
-      this.logger.log(`[SIMULACIÓN OneSignal] Web Push a [${usuarioIds.join(', ')}] -> ${titulo}: ${mensaje}`);
+      this.logger.log(
+        `[SIMULACIÓN OneSignal] Web Push a [${uniqueIds.join(', ')}] -> ${titulo}: ${mensaje}`,
+      );
       return true;
     }
 
     try {
       const notification = new OneSignal.Notification();
       notification.app_id = this.appId;
-      // Usamos include_aliases para enviar a usuarios específicos del backend (por external_id)
-      notification.include_aliases = { external_id: usuarioIds }; 
+      notification.include_aliases = { external_id: uniqueIds };
+      notification.target_channel = 'push';
       notification.headings = { en: titulo, es: titulo };
       notification.contents = { en: mensaje, es: mensaje };
-      
+
+      if (payload?.url) {
+        notification.url = payload.url;
+      }
+
+      if (payload?.alertaId) {
+        notification.data = {
+          alertaId: payload.alertaId,
+          url: payload.url ?? `${envs.dashboardUrl}/alertas`,
+        };
+      }
+
       const response = await this.client.createNotification(notification);
       this.logger.log(`OneSignal enviado con éxito: ${response.id}`);
       return true;

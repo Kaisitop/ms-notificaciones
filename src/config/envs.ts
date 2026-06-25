@@ -8,6 +8,7 @@ interface EnvVars {
   ONESIGNAL_REST_API_KEY: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
+  DASHBOARD_URL: string;
 }
 
 const envsSchema = joi.object({
@@ -17,6 +18,7 @@ const envsSchema = joi.object({
   ONESIGNAL_REST_API_KEY: joi.string().allow('').optional(),
   TELEGRAM_BOT_TOKEN: joi.string().allow('').optional(),
   TELEGRAM_CHAT_ID: joi.string().allow('').optional(),
+  DASHBOARD_URL: joi.string().uri().allow('').default('http://localhost:3001'),
 })
 .unknown(true);
 
@@ -35,4 +37,5 @@ export const envs = {
   onesignalRestApiKey: envVars.ONESIGNAL_REST_API_KEY,
   telegramBotToken: envVars.TELEGRAM_BOT_TOKEN,
   telegramChatId: envVars.TELEGRAM_CHAT_ID,
+  dashboardUrl: envVars.DASHBOARD_URL || 'http://localhost:3001',
 };
