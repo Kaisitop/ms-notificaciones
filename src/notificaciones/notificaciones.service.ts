@@ -1,10 +1,17 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
+import { randomUUID } from 'crypto';
 import { envs } from '../config';
 import { TelegramService } from './telegram.service';
 import { FcmService } from './fcm.service';
 import { OnesignalService } from './onesignal.service';
+import {
+  buildFcmDataPayload,
+  buildNotificationBody,
+  buildNotificationPayload,
+  buildNotificationTitle,
+} from './notification-payload.util';
 
 @Injectable()
 export class NotificacionesService {
@@ -20,18 +27,36 @@ export class NotificacionesService {
   async processAlerta(alerta: any) {
     this.logger.log(`Procesando alerta ${alerta.codigo} para zona ${alerta.zonaId}`);
 
-    const titulo = `Alerta Centinela — ${alerta.codigo}`;
-    const cuerpo =
-      alerta.descripcion ||
-      `Nueva alerta ${alerta.tipo}. Severidad ${alerta.severidad}.`;
-
     const alertaUrl = alerta.id
       ? `${envs.dashboardUrl}/alertas?alerta=${alerta.id}`
       : `${envs.dashboardUrl}/alertas`;
 
+    let zonaNombre: string | null = null;
+    if (alerta.zonaId) {
+      try {
+        const zona = await lastValueFrom(
+          this.natsClient.send('zonas.findOne', alerta.zonaId),
+        );
+        zonaNombre = zona?.nombre ?? null;
+      } catch (error) {
+        this.logger.warn(
+          `No se pudo cargar zona ${alerta.zonaId}: ${error.message}`,
+        );
+      }
+    }
+
+    const alertaForPayload = {
+      tipo: alerta.tipo,
+      descripcion: alerta.descripcion,
+      zona: zonaNombre ? { nombre: zonaNombre } : null,
+    };
+
+    const titulo = buildNotificationTitle(alertaForPayload);
+    const cuerpo = buildNotificationBody(alertaForPayload);
+
     const records: any[] = [];
 
-    // ── 1. Ciudadanos suscritos a la zona → FCM ──
+    // ── 1. Ciudadanos con zona principal o suscripción en la zona de la alerta → FCM ──
     if (alerta.zonaId) {
       let usuarios: any[] = [];
       try {
@@ -61,26 +86,79 @@ export class NotificacionesService {
           rolesMapping.map((r) => [r.usuarioId, r.rol]),
         );
 
-        for (const u of usuarios) {
-          if (mapRoles.get(u.usuarioId) !== 'ciudadano') continue;
+        const ciudadanoIds = usuarios
+          .filter((u) => mapRoles.get(u.usuarioId) === 'ciudadano')
+          .map((u) => u.usuarioId);
 
-          const fcmTokenFake = `device_token_${u.usuarioId.split('-')[0]}`;
-          const success = await this.fcmService.sendPush(
-            fcmTokenFake,
-            titulo,
-            cuerpo,
-            { alertaId: alerta.id },
+        let fcmTokens: { usuarioId: string; fcmToken: string }[] = [];
+        if (ciudadanoIds.length > 0) {
+          try {
+            fcmTokens = await lastValueFrom(
+              this.natsClient.send(
+                'dispositivos.get_fcm_tokens_by_users',
+                ciudadanoIds,
+              ),
+            );
+          } catch (error) {
+            this.logger.error(
+              `Error obteniendo tokens FCM de ms-auth: ${error.message}`,
+            );
+          }
+        }
+
+        if (fcmTokens.length === 0) {
+          this.logger.warn(
+            `No hay tokens FCM activos para ciudadanos de la zona ${alerta.zonaId}.`,
+          );
+        }
+
+        for (const { usuarioId, fcmToken } of fcmTokens) {
+          const notificationId = randomUUID();
+          const createdAt = new Date();
+          const payload = buildNotificationPayload({
+            id: notificationId,
+            alertaId: alerta.id,
+            createdAt,
+            leida: false,
+            alerta: alertaForPayload,
+          });
+
+          const result = await this.fcmService.sendPush(
+            fcmToken,
+            payload.title,
+            payload.body,
+            buildFcmDataPayload(payload),
           );
 
+          if (!result.success && result.invalidToken) {
+            try {
+              await lastValueFrom(
+                this.natsClient.send('dispositivos.deactivate_fcm_token', {
+                  fcmToken,
+                }),
+              );
+              this.logger.warn(`Token FCM desactivado: ${fcmToken}`);
+            } catch (error) {
+              this.logger.error(
+                `Error desactivando token FCM ${fcmToken}: ${error.message}`,
+              );
+            }
+          }
+
           records.push({
+            id: notificationId,
             alertaId: alerta.id,
             canal: 'fcm',
-            destinatarioId: u.usuarioId,
+            destinatarioId: usuarioId,
             titulo,
             cuerpo,
-            estado: success ? 'enviada' : 'fallida',
+            estado: result.success ? 'enviada' : 'fallida',
             intentos: 1,
-            proveedorMsgId: success ? 'sim_msg_id' : null,
+            proveedorMsgId: result.success ? fcmToken.slice(0, 32) : null,
+            errorDetalle: result.success ? null : 'FCM rechazó el token',
+            leida: false,
+            enviadaEn: result.success ? new Date() : null,
+            createdAt,
           });
         }
       }
@@ -138,7 +216,9 @@ export class NotificacionesService {
 
     if (records.length > 0) {
       try {
-        this.natsClient.emit('notificaciones.create', records);
+        await lastValueFrom(
+          this.natsClient.send('notificaciones.create', records),
+        );
         this.logger.log(`Historial de ${records.length} notificaciones enviado a ms-core.`);
       } catch (e) {
         this.logger.error(`Error enviando registros de notificaciones a ms-core: ${e.message}`);
