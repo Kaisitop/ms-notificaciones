@@ -3,3 +3,4 @@ dist/
 .env
 firebase-key.json
 *.log
+secrets/firebase-service-account.json
