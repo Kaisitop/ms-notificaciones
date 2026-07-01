@@ -45,6 +45,10 @@ En el archivo `.env` puedes configurar los tokens reales. Si no los tienes, el s
 - `ONESIGNAL_REST_API_KEY`: API Key de OneSignal.
 - `TELEGRAM_BOT_TOKEN`: Token de tu bot de Telegram.
 - `TELEGRAM_CHAT_ID`: ID del chat/canal donde enviar avisos.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`: Envío de correos transaccionales (verificación, recuperación de contraseña).
+- `PUBLIC_WEB_URL`: URL base del frontend para enlaces en emails.
+
+> **Fotos y evidencia:** las imágenes de reportes y alertas se gestionan en `c-gateway` (Cloudinary) y `ms-core` (URLs en BD). Este servicio no adjunta imágenes a push/email; solo notifica el evento de alerta.
 
 ## Levantar el servicio
 
@@ -54,10 +58,10 @@ npm run start:dev
 
 ## Modo Simulación vs Producción
 
-El servicio está preparado para salir a producción. 
+- **Push (FCM) y Telegram:** si las llaves están en blanco, FCM/Telegram pueden operar en modo simulación (consola).
+- **Email (SMTP):** es **obligatorio** en entornos con registro/verificación activos. Configura Gmail App Password u otro SMTP en `.env` (ver `.env.example`).
 
-- Si proporcionas llaves válidas en `.env`, el código de `fcm.service.ts` y `telegram.service.ts` intentará despachar los mensajes usando las SDK oficiales (ej. `firebase-admin` o peticiones POST vía `axios`).
-- Si las llaves están en blanco (como por defecto), el sistema asume un entorno de desarrollo/prototipo y mostrará algo como esto:
+Ejemplo de log en desarrollo (push simulado):
 
 ```bash
 [NotificacionesBootstrap] Microservicio de Notificaciones escuchando en NATS
@@ -67,3 +71,7 @@ El servicio está preparado para salir a producción.
 [TelegramService] [SIMULACIÓN TELEGRAM] A ChatID N/A -> ALERTA GENERAL - ALRT-001...
 [NotificacionesService] Historial de 1 notificaciones enviado a ms-core.
 ```
+
+## Email transaccional
+
+Escucha eventos NATS (`email.send_verification`, `email.send_password_reset`, etc.) emitidos por `ms-auth` y envía HTML vía Nodemailer. Las variables SMTP se inyectan desde el `.env` raíz del monorepo en Docker Compose.
