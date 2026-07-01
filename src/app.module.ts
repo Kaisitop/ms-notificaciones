@@ -3,6 +3,8 @@ import { NotificacionesService } from './notificaciones/notificaciones.service';
 import { TelegramService } from './notificaciones/telegram.service';
 import { FcmService } from './notificaciones/fcm.service';
 import { OnesignalService } from './notificaciones/onesignal.service';
+import { EmailController } from './email/email.controller';
+import { EmailService } from './email/email.service';
 import { envs } from './config';
 
 import { Module } from '@nestjs/common';
@@ -21,7 +23,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       },
     ]),
   ],
-  controllers: [NotificacionesController],
-  providers: [NotificacionesService, TelegramService, FcmService, OnesignalService],
+  controllers: [NotificacionesController, EmailController],
+  providers: [NotificacionesService, TelegramService, FcmService, OnesignalService, EmailService],
 })
 export class AppModule {}
