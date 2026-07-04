@@ -96,7 +96,10 @@ export function buildVerificationEmail(params: {
 
 export function buildPasswordResetEmail(params: {
   nombre?: string | null;
-  resetUrl: string;
+  appResetUrl: string;
+  androidIntentUrl: string;
+  webResetUrl?: string;
+  token: string;
   expiresInMinutes: number;
 }): EmailContent {
   const nombre = params.nombre?.trim() || 'usuario';
@@ -104,13 +107,39 @@ export function buildPasswordResetEmail(params: {
   const html = baseLayout({
     heading: 'Restablece tu contraseña',
     greeting: `Hola ${nombre},`,
-    intro: `Recibimos una solicitud para restablecer la contraseña de tu cuenta. Este enlace expira en ${params.expiresInMinutes} minutos. Si no fuiste tú, ignora este correo.`,
-    buttonLabel: 'Crear nueva contraseña',
-    buttonUrl: params.resetUrl,
-    fallbackNote: 'Si el botón no funciona, copia y pega este enlace en tu navegador:',
+    intro:
+      `Recibimos una solicitud para restablecer la contraseña de tu cuenta. ` +
+      `Este enlace expira en ${params.expiresInMinutes} minutos. ` +
+      `Abre el correo en el mismo teléfono donde tienes instalada la app Centinela.`,
+    buttonLabel: 'Abrir en la app Centinela',
+    buttonUrl: params.appResetUrl,
+    fallbackNote:
+      'Si el botón no abre la app, copia el token de abajo y en Centinela ve a ' +
+      '"¿Olvidaste tu contraseña?" → "Ingresar token manualmente":',
     footerNote:
       'Por tu seguridad, este enlace solo puede usarse una vez. Si no solicitaste el cambio, tu contraseña actual sigue siendo válida.',
-  });
-  const text = `Hola ${nombre},\n\nSolicitaste restablecer tu contraseña en Centinela. Abre este enlace (expira en ${params.expiresInMinutes} minutos):\n${params.resetUrl}\n\nSi no fuiste tú, ignora este mensaje.`;
+  }).replace(
+    '</td>\n            </tr>\n            <tr>\n              <td style="padding:20px 32px;border-top:1px solid #334155;">',
+    `</td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 24px;">
+                <p style="margin:0 0 8px;color:#94a3b8;font-size:13px;">Token de recuperación:</p>
+                <p style="margin:0;padding:12px 16px;background-color:#0f172a;border-radius:8px;border:1px solid #334155;color:#e2e8f0;font-family:Consolas,Monaco,monospace;font-size:13px;word-break:break-all;">${escapeHtml(params.token)}</p>
+                ${params.webResetUrl ? `<p style="margin:16px 0 0;color:#64748b;font-size:12px;">Enlace web alternativo: <a href="${params.webResetUrl}" style="color:#818cf8;">${escapeHtml(params.webResetUrl)}</a></p>` : ''}
+                <p style="margin:16px 0 0;color:#64748b;font-size:12px;">Android (Gmail): <a href="${params.androidIntentUrl}" style="color:#818cf8;">Abrir Centinela</a></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px;border-top:1px solid #334155;">`,
+  );
+  const text =
+    `Hola ${nombre},\n\n` +
+    `Restablece tu contraseña en Centinela (expira en ${params.expiresInMinutes} minutos):\n\n` +
+    `Abrir app:\n${params.appResetUrl}\n\n` +
+    `Android (Gmail):\n${params.androidIntentUrl}\n\n` +
+    (params.webResetUrl ? `Web:\n${params.webResetUrl}\n\n` : '') +
+    `Token (pegar en la app → Ingresar token manualmente):\n${params.token}\n\n` +
+    `Si no fuiste tú, ignora este mensaje.`;
   return { subject, html, text };
 }

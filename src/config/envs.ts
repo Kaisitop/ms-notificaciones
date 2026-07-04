@@ -16,6 +16,8 @@ interface EnvVars {
   SMTP_PASS: string;
   MAIL_FROM: string;
   PUBLIC_WEB_URL: string;
+  APP_RESET_URL: string;
+  ANDROID_APP_PACKAGE: string;
 }
 
 const envsSchema = joi.object({
@@ -33,6 +35,8 @@ const envsSchema = joi.object({
   SMTP_PASS: joi.string().required(),
   MAIL_FROM: joi.string().required(),
   PUBLIC_WEB_URL: joi.string().uri().optional(),
+  APP_RESET_URL: joi.string().default('centinela://reset-password'),
+  ANDROID_APP_PACKAGE: joi.string().default('com.example.centinela_milagro'),
 })
 .unknown(true);
 
@@ -59,4 +63,6 @@ export const envs = {
   smtpPass: envVars.SMTP_PASS,
   mailFrom: envVars.MAIL_FROM,
   publicWebUrl: envVars.PUBLIC_WEB_URL || envVars.DASHBOARD_URL || 'http://localhost:3001',
+  appResetUrl: (envVars.APP_RESET_URL || 'centinela://reset-password').replace(/\/$/, ''),
+  androidAppPackage: envVars.ANDROID_APP_PACKAGE || 'com.example.centinela_milagro',
 };

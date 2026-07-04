@@ -57,10 +57,27 @@ export class EmailService implements OnModuleInit {
   }
 
   async sendPasswordResetEmail(payload: SendPasswordResetPayload): Promise<boolean> {
-    const resetUrl = `${this.webUrl}/reset-password?token=${encodeURIComponent(payload.token)}`;
+    const encodedToken = encodeURIComponent(payload.token);
+    const appResetUrl = `${envs.appResetUrl}?token=${encodedToken}`;
+    const androidIntentUrl =
+      `intent://reset-password?token=${encodedToken}` +
+      `#Intent;scheme=centinela;package=${envs.androidAppPackage};end`;
+    const webBase = this.webUrl.toLowerCase();
+    const includeWebLink =
+      !webBase.includes('localhost') && !webBase.includes('127.0.0.1');
+    const webResetUrl = includeWebLink
+      ? `${this.webUrl}/reset-password?token=${encodedToken}`
+      : undefined;
+    this.logger.log(
+      `Reset email → app: ${envs.appResetUrl}?token=…` +
+        (webResetUrl ? ` | web: ${webResetUrl}` : ' | web: omitido (localhost)'),
+    );
     const content = buildPasswordResetEmail({
       nombre: payload.nombre,
-      resetUrl,
+      appResetUrl,
+      androidIntentUrl,
+      webResetUrl,
+      token: payload.token,
       expiresInMinutes: payload.expiresInMinutes ?? 60,
     });
     return this.deliver(payload.email, content);
