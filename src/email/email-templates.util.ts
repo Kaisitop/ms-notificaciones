@@ -22,10 +22,22 @@ function baseLayout(options: {
   intro: string;
   buttonLabel: string;
   buttonUrl: string;
+  secondaryButtonLabel?: string;
+  secondaryButtonUrl?: string;
   fallbackNote: string;
   footerNote: string;
 }): string {
-  const { heading, greeting, intro, buttonLabel, buttonUrl, fallbackNote, footerNote } = options;
+  const {
+    heading,
+    greeting,
+    intro,
+    buttonLabel,
+    buttonUrl,
+    secondaryButtonLabel,
+    secondaryButtonUrl,
+    fallbackNote,
+    footerNote,
+  } = options;
   return `<!DOCTYPE html>
 <html lang="es">
   <head>
@@ -51,12 +63,19 @@ function baseLayout(options: {
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="border-radius:10px;background-color:${BRAND_COLOR};">
-                      <a href="${buttonUrl}" target="_blank" style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:10px;">${escapeHtml(buttonLabel)}</a>
+                      <a href="${buttonUrl}" style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:10px;">${escapeHtml(buttonLabel)}</a>
                     </td>
                   </tr>
                 </table>
+                ${secondaryButtonUrl && secondaryButtonLabel ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;">
+                  <tr>
+                    <td style="border-radius:10px;border:1px solid #475569;">
+                      <a href="${secondaryButtonUrl}" style="display:inline-block;padding:11px 24px;color:#cbd5e1;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px;">${escapeHtml(secondaryButtonLabel)}</a>
+                    </td>
+                  </tr>
+                </table>` : ''}
                 <p style="margin:24px 0 8px;color:#64748b;font-size:13px;line-height:1.6;">${escapeHtml(fallbackNote)}</p>
-                <p style="margin:0;word-break:break-all;"><a href="${buttonUrl}" target="_blank" style="color:#818cf8;font-size:13px;">${escapeHtml(buttonUrl)}</a></p>
+                <p style="margin:0;word-break:break-all;"><a href="${buttonUrl}" style="color:#818cf8;font-size:13px;">${escapeHtml(buttonUrl)}</a></p>
               </td>
             </tr>
             <tr>
@@ -96,10 +115,7 @@ export function buildVerificationEmail(params: {
 
 export function buildPasswordResetEmail(params: {
   nombre?: string | null;
-  appResetUrl: string;
-  androidIntentUrl: string;
-  webResetUrl?: string;
-  token: string;
+  bridgeUrl: string;
   expiresInMinutes: number;
 }): EmailContent {
   const nombre = params.nombre?.trim() || 'usuario';
@@ -110,36 +126,18 @@ export function buildPasswordResetEmail(params: {
     intro:
       `Recibimos una solicitud para restablecer la contraseña de tu cuenta. ` +
       `Este enlace expira en ${params.expiresInMinutes} minutos. ` +
-      `Abre el correo en el mismo teléfono donde tienes instalada la app Centinela.`,
-    buttonLabel: 'Abrir en la app Centinela',
-    buttonUrl: params.appResetUrl,
-    fallbackNote:
-      'Si el botón no abre la app, copia el token de abajo y en Centinela ve a ' +
-      '"¿Olvidaste tu contraseña?" → "Ingresar token manualmente":',
+      `Abre el correo en el mismo teléfono donde tienes instalada la app Centinela ` +
+      `y conectado a la misma red Wi‑Fi que el servidor.`,
+    buttonLabel: 'Restablecer contraseña en Centinela',
+    buttonUrl: params.bridgeUrl,
+    fallbackNote: 'Si el botón no funciona, copia y pega este enlace en el navegador de tu teléfono:',
     footerNote:
       'Por tu seguridad, este enlace solo puede usarse una vez. Si no solicitaste el cambio, tu contraseña actual sigue siendo válida.',
-  }).replace(
-    '</td>\n            </tr>\n            <tr>\n              <td style="padding:20px 32px;border-top:1px solid #334155;">',
-    `</td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px 24px;">
-                <p style="margin:0 0 8px;color:#94a3b8;font-size:13px;">Token de recuperación:</p>
-                <p style="margin:0;padding:12px 16px;background-color:#0f172a;border-radius:8px;border:1px solid #334155;color:#e2e8f0;font-family:Consolas,Monaco,monospace;font-size:13px;word-break:break-all;">${escapeHtml(params.token)}</p>
-                ${params.webResetUrl ? `<p style="margin:16px 0 0;color:#64748b;font-size:12px;">Enlace web alternativo: <a href="${params.webResetUrl}" style="color:#818cf8;">${escapeHtml(params.webResetUrl)}</a></p>` : ''}
-                <p style="margin:16px 0 0;color:#64748b;font-size:12px;">Android (Gmail): <a href="${params.androidIntentUrl}" style="color:#818cf8;">Abrir Centinela</a></p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:20px 32px;border-top:1px solid #334155;">`,
-  );
+  });
   const text =
     `Hola ${nombre},\n\n` +
     `Restablece tu contraseña en Centinela (expira en ${params.expiresInMinutes} minutos):\n\n` +
-    `Abrir app:\n${params.appResetUrl}\n\n` +
-    `Android (Gmail):\n${params.androidIntentUrl}\n\n` +
-    (params.webResetUrl ? `Web:\n${params.webResetUrl}\n\n` : '') +
-    `Token (pegar en la app → Ingresar token manualmente):\n${params.token}\n\n` +
+    `${params.bridgeUrl}\n\n` +
     `Si no fuiste tú, ignora este mensaje.`;
   return { subject, html, text };
 }
