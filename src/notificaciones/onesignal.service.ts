@@ -26,7 +26,9 @@ export class OnesignalService implements OnModuleInit {
       this.isConfigured = true;
       this.logger.log('OneSignal Configurado (Modo Producción)');
     } else {
-      this.logger.warn('Faltan ONESIGNAL_APP_ID o ONESIGNAL_REST_API_KEY. Modo SIMULACIÓN para Web.');
+      this.logger.warn(
+        'Faltan ONESIGNAL_APP_ID o ONESIGNAL_REST_API_KEY. Modo SIMULACIÓN para Web.',
+      );
     }
   }
 
@@ -65,90 +67,12 @@ export class OnesignalService implements OnModuleInit {
         };
       }
 
-      this.logger.log(
-        `OneSignal web push → external_id=[${uniqueIds.join(', ')}] ` +
-          `titulo="${titulo}"`,
-      );
-
       const response = await this.client.createNotification(notification);
-
-      const notificationId = response?.id?.trim?.() ?? '';
-      const errors = this.extractErrors(response);
-      const invalidAliases = this.extractInvalidAliases(response);
-
-      if (!notificationId) {
-        this.logger.warn(
-          `OneSignal no creó la notificación (sin id). ` +
-            `Destinatarios: [${uniqueIds.join(', ')}]. ` +
-            (errors.length > 0
-              ? `Errores: ${errors.join(' | ')}`
-              : 'Ningún navegador suscrito con ese external_id.'),
-        );
-        return false;
-      }
-
-      if (invalidAliases.length > 0) {
-        this.logger.warn(
-          `OneSignal id=${notificationId} pero aliases inválidos / sin suscripción: ` +
-            `${invalidAliases.join(' | ')}. ` +
-            `En el panel: inicia sesión → Activar alertas push. ` +
-            `El external_id debe ser el UUID del usuario.`,
-        );
-        return false;
-      }
-
-      if (errors.length > 0) {
-        this.logger.warn(
-          `OneSignal id=${notificationId} con avisos: ${errors.join(' | ')}`,
-        );
-      }
-
-      this.logger.log(
-        `OneSignal enviado con éxito: ${notificationId} ` +
-          `(destinatarios solicitados: ${uniqueIds.length})`,
-      );
+      this.logger.log(`OneSignal enviado con éxito: ${response.id}`);
       return true;
     } catch (error) {
-      const message = error?.message ?? String(error);
-      const body =
-        typeof error?.body === 'string'
-          ? error.body
-          : error?.body
-            ? JSON.stringify(error.body)
-            : '';
-      this.logger.error(
-        `Error enviando OneSignal Web Push: ${message}` +
-          (body ? ` | body: ${body}` : ''),
-      );
+      this.logger.error(`Error enviando OneSignal Web Push: ${error.message}`);
       return false;
     }
-  }
-
-  private extractErrors(response: unknown): string[] {
-    if (!response || typeof response !== 'object') return [];
-    const errors = (response as { errors?: unknown }).errors;
-    if (!errors) return [];
-    if (Array.isArray(errors)) {
-      return errors.map((e) =>
-        typeof e === 'string' ? e : JSON.stringify(e),
-      );
-    }
-    if (typeof errors === 'string') return [errors];
-    return [JSON.stringify(errors)];
-  }
-
-  private extractInvalidAliases(response: unknown): string[] {
-    if (!response || typeof response !== 'object') return [];
-    const errors = (response as { errors?: unknown }).errors;
-    if (!errors || typeof errors !== 'object' || Array.isArray(errors)) {
-      return [];
-    }
-
-    const aliasErrors = errors as Record<string, unknown>;
-    const parts: string[] = [];
-    for (const [key, value] of Object.entries(aliasErrors)) {
-      parts.push(`${key}=${JSON.stringify(value)}`);
-    }
-    return parts;
   }
 }
