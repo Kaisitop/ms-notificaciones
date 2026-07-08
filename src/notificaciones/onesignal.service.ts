@@ -66,11 +66,50 @@ export class OnesignalService implements OnModuleInit {
       }
 
       const response = await this.client.createNotification(notification);
-      this.logger.log(`OneSignal enviado con éxito: ${response.id}`);
+
+      const notificationId = response?.id?.trim?.() ?? '';
+      const errors = this.extractErrors(response);
+
+      if (!notificationId) {
+        this.logger.warn(
+          `OneSignal no entregó la notificación (sin id). ` +
+            `Destinatarios external_id: [${uniqueIds.join(', ')}]. ` +
+            (errors.length > 0
+              ? `Errores: ${errors.join(' | ')}`
+              : 'Ningún navegador suscrito con ese external_id. ' +
+                'En el panel web: Activar alertas push tras iniciar sesión.'),
+        );
+        return false;
+      }
+
+      this.logger.log(`OneSignal enviado con éxito: ${notificationId}`);
       return true;
     } catch (error) {
-      this.logger.error(`Error enviando OneSignal Web Push: ${error.message}`);
+      const message = error?.message ?? String(error);
+      const body =
+        typeof error?.body === 'string'
+          ? error.body
+          : error?.body
+            ? JSON.stringify(error.body)
+            : '';
+      this.logger.error(
+        `Error enviando OneSignal Web Push: ${message}` +
+          (body ? ` | body: ${body}` : ''),
+      );
       return false;
     }
+  }
+
+  private extractErrors(response: unknown): string[] {
+    if (!response || typeof response !== 'object') return [];
+    const errors = (response as { errors?: unknown }).errors;
+    if (!errors) return [];
+    if (Array.isArray(errors)) {
+      return errors.map((e) =>
+        typeof e === 'string' ? e : JSON.stringify(e),
+      );
+    }
+    if (typeof errors === 'string') return [errors];
+    return [JSON.stringify(errors)];
   }
 }
