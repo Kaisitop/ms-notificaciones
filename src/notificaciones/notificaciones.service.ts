@@ -27,10 +27,6 @@ export class NotificacionesService {
   async processAlerta(alerta: any) {
     this.logger.log(`Procesando alerta ${alerta.codigo} para zona ${alerta.zonaId}`);
 
-    const alertaUrl = alerta.id
-      ? `${envs.dashboardUrl}/alertas?alerta=${alerta.id}`
-      : `${envs.dashboardUrl}/alertas`;
-
     let zonaNombre: string | null = null;
     if (alerta.zonaId) {
       try {
@@ -174,16 +170,30 @@ export class NotificacionesService {
       this.logger.error(`Error obteniendo destinatarios web push: ${error.message}`);
     }
 
-    const webIds = webRecipients.map((r) => r.usuarioId);
-    if (webIds.length > 0) {
+    const panelUrl = envs.dashboardUrl.replace(/\/$/, '');
+    const alertaUrlOperador = alerta.id
+      ? `${panelUrl}/alertas?alerta=${alerta.id}`
+      : `${panelUrl}/alertas`;
+    const alertaUrlPolicia = alerta.id
+      ? `${panelUrl}/patrullaje?alerta=${alerta.id}`
+      : `${panelUrl}/patrullaje`;
+
+    const operadorIds = webRecipients
+      .filter((r) => r.rol === 'admin' || r.rol === 'operador')
+      .map((r) => r.usuarioId);
+    const policiaIds = webRecipients
+      .filter((r) => r.rol === 'policia')
+      .map((r) => r.usuarioId);
+
+    if (operadorIds.length > 0) {
       const success = await this.onesignalService.sendWebPush(
-        webIds,
+        operadorIds,
         titulo,
         cuerpo,
-        { alertaId: alerta.id, url: alertaUrl },
+        { alertaId: alerta.id, url: alertaUrlOperador },
       );
 
-      for (const opId of webIds) {
+      for (const opId of operadorIds) {
         records.push({
           alertaId: alerta.id,
           canal: 'onesignal',
@@ -195,7 +205,31 @@ export class NotificacionesService {
           proveedorMsgId: success ? 'sim_msg_id' : null,
         });
       }
-    } else {
+    }
+
+    if (policiaIds.length > 0) {
+      const success = await this.onesignalService.sendWebPush(
+        policiaIds,
+        titulo,
+        cuerpo,
+        { alertaId: alerta.id, url: alertaUrlPolicia },
+      );
+
+      for (const opId of policiaIds) {
+        records.push({
+          alertaId: alerta.id,
+          canal: 'onesignal',
+          destinatarioId: opId,
+          titulo,
+          cuerpo,
+          estado: success ? 'enviada' : 'fallida',
+          intentos: 1,
+          proveedorMsgId: success ? 'sim_msg_id' : null,
+        });
+      }
+    }
+
+    if (operadorIds.length === 0 && policiaIds.length === 0) {
       this.logger.warn('No hay usuarios del panel registrados para OneSignal web push.');
     }
 
