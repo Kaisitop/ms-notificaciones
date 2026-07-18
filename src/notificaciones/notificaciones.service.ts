@@ -13,6 +13,17 @@ import {
   buildNotificationTitle,
 } from './notification-payload.util';
 
+type NearestPatrullero = {
+  usuarioId: string;
+  nombre: string | null;
+  distanciaM: number;
+};
+
+function formatDistanceMeters(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
 @Injectable()
 export class NotificacionesService {
   private readonly logger = new Logger(NotificacionesService.name);
@@ -23,6 +34,48 @@ export class NotificacionesService {
     private readonly fcmService: FcmService,
     private readonly onesignalService: OnesignalService,
   ) {}
+
+  private async findNearestPatrulleroForAlerta(
+    alertaId: string,
+  ): Promise<NearestPatrullero | null> {
+    try {
+      const detail = await lastValueFrom(
+        this.natsClient.send('alertas.findOne', { id: alertaId }),
+      );
+      if (detail?.latitud == null || detail?.longitud == null) {
+        this.logger.warn(
+          `Alerta ${alertaId} sin coordenadas — no se puede calcular patrullero cercano.`,
+        );
+        return null;
+      }
+
+      const nearest = await lastValueFrom(
+        this.natsClient.send('patrullaje.findNearest', {
+          latitud: Number(detail.latitud),
+          longitud: Number(detail.longitud),
+          maxAgeSec: 180,
+        }),
+      );
+
+      if (!nearest?.usuarioId) {
+        this.logger.warn(
+          `Sin patrulleros activos con GPS reciente para alerta ${alertaId}.`,
+        );
+        return null;
+      }
+
+      return {
+        usuarioId: nearest.usuarioId,
+        nombre: nearest.nombre ?? null,
+        distanciaM: Number(nearest.distanciaM ?? 0),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error buscando patrullero cercano para alerta ${alertaId}: ${error.message}`,
+      );
+      return null;
+    }
+  }
 
   async processAlerta(alerta: any) {
     this.logger.log(`Procesando alerta ${alerta.codigo} para zona ${alerta.zonaId}`);
@@ -185,6 +238,10 @@ export class NotificacionesService {
       .filter((r) => r.rol === 'policia')
       .map((r) => r.usuarioId);
 
+    const nearestPatrullero = alerta.id
+      ? await this.findNearestPatrulleroForAlerta(alerta.id)
+      : null;
+
     if (operadorIds.length > 0) {
       const success = await this.onesignalService.sendWebPush(
         operadorIds,
@@ -207,46 +264,91 @@ export class NotificacionesService {
       }
     }
 
-    if (policiaIds.length > 0) {
+    const policiaTargetIds = nearestPatrullero
+      ? [nearestPatrullero.usuarioId]
+      : policiaIds;
+
+    const distLabel = nearestPatrullero
+      ? formatDistanceMeters(nearestPatrullero.distanciaM)
+      : null;
+    const policiaTitulo = nearestPatrullero
+      ? `Alerta cercana — ${alerta.codigo}`
+      : titulo;
+    const policiaCuerpo = nearestPatrullero
+      ? `${cuerpo} Te encuentras a ~${distLabel}. Se te asigna respuesta prioritaria.`
+      : cuerpo;
+
+    if (policiaTargetIds.length > 0) {
       const success = await this.onesignalService.sendWebPush(
-        policiaIds,
-        titulo,
-        cuerpo,
+        policiaTargetIds,
+        policiaTitulo,
+        policiaCuerpo,
         { alertaId: alerta.id, url: alertaUrlPolicia },
       );
 
-      for (const opId of policiaIds) {
+      for (const opId of policiaTargetIds) {
         records.push({
           alertaId: alerta.id,
           canal: 'onesignal',
           destinatarioId: opId,
-          titulo,
-          cuerpo,
+          titulo: policiaTitulo,
+          cuerpo: policiaCuerpo,
           estado: success ? 'enviada' : 'fallida',
           intentos: 1,
           proveedorMsgId: success ? 'sim_msg_id' : null,
         });
       }
+
+      if (nearestPatrullero) {
+        this.logger.log(
+          `Push prioritario al patrullero más cercano: ${nearestPatrullero.usuarioId} (${nearestPatrullero.nombre ?? 'sin nombre'}) — ${distLabel}`,
+        );
+      }
     }
 
-    if (operadorIds.length === 0 && policiaIds.length === 0) {
+    if (operadorIds.length === 0 && policiaTargetIds.length === 0) {
       this.logger.warn('No hay usuarios del panel registrados para OneSignal web push.');
     }
 
-    // ── 3. Telegram patrulla ──
-    if (alerta.tipo === 'audio_ia' || alerta.generadaPor === 'yamnet_auto') {
-      await this.telegramService.sendAlert(
-        `DISPARO / GRITO CONFIRMADO — ${alerta.codigo}`,
-        `Descripción: ${alerta.descripcion || alerta.tipo}\nSeveridad: ${alerta.severidad}\nZona: ${alerta.zonaId || 'N/A'}`,
-        alerta.id,
-      );
-    } else {
-      await this.telegramService.sendAlert(
-        `ALERTA GENERAL — ${alerta.codigo}`,
-        `Descripción: ${alerta.descripcion || alerta.tipo}\nSeveridad: ${alerta.severidad}`,
-        alerta.id,
-      );
-    }
+    // ── 3. Telegram: grupo operadores/policía + canal ciudadanos ──
+    const zonaLabel = zonaNombre || alerta.zonaId || 'Sin zona';
+    const isCriticalIa =
+      alerta.tipo === 'audio_ia' || alerta.generadaPor === 'yamnet_auto';
+
+    const staffTitulo = isCriticalIa
+      ? `DISPARO / GRITO CONFIRMADO — ${alerta.codigo}`
+      : `ALERTA OPERATIVA — ${alerta.codigo}`;
+    const staffMensaje = [
+      `Tipo: ${alerta.tipo}`,
+      `Descripción: ${alerta.descripcion || 'N/A'}`,
+      `Severidad: ${alerta.severidad}`,
+      `Zona: ${zonaLabel}`,
+      nearestPatrullero
+        ? `Patrullero más cercano: ${nearestPatrullero.nombre ?? nearestPatrullero.usuarioId} (~${formatDistanceMeters(nearestPatrullero.distanciaM)})`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await this.telegramService.sendStaffAlert(
+      staffTitulo,
+      staffMensaje,
+      alerta.id,
+    );
+
+    const citizenTitulo = isCriticalIa
+      ? `Alerta de seguridad — ${zonaLabel}`
+      : `Aviso en su sector — ${zonaLabel}`;
+    const citizenMensaje = [
+      `Se ha registrado un incidente en ${zonaLabel}.`,
+      `Tipo: ${alerta.tipo}.`,
+      alerta.descripcion ? `Detalle: ${alerta.descripcion}` : null,
+      'Mantenga precaución y siga las indicaciones oficiales.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await this.telegramService.sendCitizenAlert(citizenTitulo, citizenMensaje);
 
     if (records.length > 0) {
       try {

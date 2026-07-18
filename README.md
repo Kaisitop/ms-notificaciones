@@ -15,6 +15,7 @@ ms-core (Alerta detectada)
          3. Envío según rol:
             - Si es 'ciudadano' -> Firebase Cloud Messaging (FCM / App Móvil)
             - Si es 'operador' o 'admin' -> OneSignal (Notificación Web)
+            - Telegram -> grupo operadores/policía + canal ciudadanos
          4. NATS: notificaciones.create (Guarda historial en BD)
 ```
 
@@ -43,8 +44,11 @@ En el archivo `.env` puedes configurar los tokens reales. Si no los tienes, el s
 - `FIREBASE_SERVICE_ACCOUNT_PATH`: Ruta al archivo JSON de credenciales de Firebase.
 - `ONESIGNAL_APP_ID`: ID de la aplicación en OneSignal.
 - `ONESIGNAL_REST_API_KEY`: API Key de OneSignal.
-- `TELEGRAM_BOT_TOKEN`: Token de tu bot de Telegram.
-- `TELEGRAM_CHAT_ID`: ID del chat/canal donde enviar avisos.
+- `TELEGRAM_BOT_TOKEN`: Token del bot (BotFather).
+- `TELEGRAM_STAFF_GROUP_ID`: ID del **grupo** operadores + patrulleros (ej. `-1001234567890`).
+- `TELEGRAM_CITIZEN_CHANNEL_ID`: ID o `@username` del **canal** público de alertas ciudadanas.
+- `TELEGRAM_CHAT_ID`: *(legacy)* fallback del grupo operativo si no defines `STAFF_GROUP_ID`.
+- `DASHBOARD_URL`: URL del panel web (enlaces en botones del grupo operativo).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`: Envío de correos transaccionales (verificación, recuperación de contraseña).
 - `PUBLIC_WEB_URL`: URL base del frontend para enlaces en emails.
 

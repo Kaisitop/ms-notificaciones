@@ -8,6 +8,10 @@ interface EnvVars {
   ONESIGNAL_REST_API_KEY: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
+  TELEGRAM_STAFF_GROUP_ID: string;
+  TELEGRAM_CITIZEN_CHANNEL_ID: string;
+  TELEGRAM_GROUP_ID: string;
+  TELEGRAM_CHANNEL_ID: string;
   DASHBOARD_URL: string;
   SMTP_HOST: string;
   SMTP_PORT: number;
@@ -28,6 +32,10 @@ const envsSchema = joi.object({
   ONESIGNAL_REST_API_KEY: joi.string().allow('').optional(),
   TELEGRAM_BOT_TOKEN: joi.string().allow('').optional(),
   TELEGRAM_CHAT_ID: joi.string().allow('').optional(),
+  TELEGRAM_STAFF_GROUP_ID: joi.string().allow('').optional(),
+  TELEGRAM_CITIZEN_CHANNEL_ID: joi.string().allow('').optional(),
+  TELEGRAM_GROUP_ID: joi.string().allow('').optional(),
+  TELEGRAM_CHANNEL_ID: joi.string().allow('').optional(),
   DASHBOARD_URL: joi.string().uri().allow('').default('http://localhost:3001'),
   SMTP_HOST: joi.string().required(),
   SMTP_PORT: joi.number().default(587),
@@ -57,6 +65,12 @@ export const envs = {
   onesignalRestApiKey: envVars.ONESIGNAL_REST_API_KEY,
   telegramBotToken: envVars.TELEGRAM_BOT_TOKEN,
   telegramChatId: envVars.TELEGRAM_CHAT_ID,
+  telegramStaffGroupId:
+    envVars.TELEGRAM_STAFF_GROUP_ID ||
+    envVars.TELEGRAM_GROUP_ID ||
+    envVars.TELEGRAM_CHAT_ID,
+  telegramCitizenChannelId:
+    envVars.TELEGRAM_CITIZEN_CHANNEL_ID || envVars.TELEGRAM_CHANNEL_ID,
   dashboardUrl: envVars.DASHBOARD_URL || 'http://localhost:3001',
   smtpHost: envVars.SMTP_HOST,
   smtpPort: envVars.SMTP_PORT,
