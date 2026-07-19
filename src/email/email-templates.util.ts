@@ -115,29 +115,38 @@ export function buildVerificationEmail(params: {
 
 export function buildPasswordResetEmail(params: {
   nombre?: string | null;
-  bridgeUrl: string;
+  resetUrl: string;
   expiresInMinutes: number;
+  channel: 'web' | 'app';
 }): EmailContent {
   const nombre = params.nombre?.trim() || 'usuario';
   const subject = 'Restablece tu contraseña — Centinela';
+  const isWeb = params.channel === 'web';
+
   const html = baseLayout({
     heading: 'Restablece tu contraseña',
     greeting: `Hola ${nombre},`,
-    intro:
-      `Recibimos una solicitud para restablecer la contraseña de tu cuenta. ` +
-      `Este enlace expira en ${params.expiresInMinutes} minutos. ` +
-      `Abre el correo en el mismo teléfono donde tienes instalada la app Centinela ` +
-      `y conectado a la misma red Wi‑Fi que el servidor.`,
-    buttonLabel: 'Restablecer contraseña en Centinela',
-    buttonUrl: params.bridgeUrl,
-    fallbackNote: 'Si el botón no funciona, copia y pega este enlace en el navegador de tu teléfono:',
+    intro: isWeb
+      ? `Recibimos una solicitud para restablecer la contraseña de tu cuenta del panel Centinela. ` +
+        `Este enlace expira en ${params.expiresInMinutes} minutos. ` +
+        `Ábrelo en el navegador donde usas el dashboard.`
+      : `Recibimos una solicitud para restablecer la contraseña de tu cuenta en la app Centinela. ` +
+        `Este enlace expira en ${params.expiresInMinutes} minutos. ` +
+        `Abre el correo en el mismo teléfono donde tienes instalada la app y conectado a la misma red Wi‑Fi que el servidor.`,
+    buttonLabel: isWeb
+      ? 'Restablecer contraseña en el panel'
+      : 'Restablecer contraseña en la app',
+    buttonUrl: params.resetUrl,
+    fallbackNote: isWeb
+      ? 'Si el botón no funciona, copia y pega este enlace en tu navegador:'
+      : 'Si el botón no funciona, copia y pega este enlace en el navegador de tu teléfono:',
     footerNote:
       'Por tu seguridad, este enlace solo puede usarse una vez. Si no solicitaste el cambio, tu contraseña actual sigue siendo válida.',
   });
   const text =
     `Hola ${nombre},\n\n` +
     `Restablece tu contraseña en Centinela (expira en ${params.expiresInMinutes} minutos):\n\n` +
-    `${params.bridgeUrl}\n\n` +
+    `${params.resetUrl}\n\n` +
     `Si no fuiste tú, ignora este mensaje.`;
   return { subject, html, text };
 }

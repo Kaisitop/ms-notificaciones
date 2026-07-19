@@ -19,6 +19,8 @@ export interface SendPasswordResetPayload {
   nombre?: string | null;
   token: string;
   expiresInMinutes?: number;
+  /** `web` = panel; `app` = app móvil (deep link). */
+  channel?: 'web' | 'app';
 }
 
 @Injectable()
@@ -58,13 +60,19 @@ export class EmailService implements OnModuleInit {
 
   async sendPasswordResetEmail(payload: SendPasswordResetPayload): Promise<boolean> {
     const encodedToken = encodeURIComponent(payload.token);
-    const bridgeUrl =
-      `${envs.publicApiUrl}/api/auth/reset-password/open?token=${encodedToken}`;
-    this.logger.log(`Reset email → bridge: ${bridgeUrl}`);
+    const channel = payload.channel ?? 'app';
+    const resetUrl =
+      channel === 'web'
+        ? `${this.webUrl}/reset-password?token=${encodedToken}`
+        : `${envs.publicApiUrl}/api/auth/reset-password/open?token=${encodedToken}`;
+
+    this.logger.log(`Reset email (${channel}) → ${resetUrl}`);
+
     const content = buildPasswordResetEmail({
       nombre: payload.nombre,
-      bridgeUrl,
+      resetUrl,
       expiresInMinutes: payload.expiresInMinutes ?? 60,
+      channel,
     });
     return this.deliver(payload.email, content);
   }

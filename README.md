@@ -1,6 +1,8 @@
 # ms-notificaciones
 
-Microservicio encargado de enviar alertas y notificaciones a los ciudadanos y operadores del sistema CENTINELA (UNEMI).
+> **Monorepo:** [README.md](../README.md) · [docs/contexto.md](../docs/contexto.md)
+
+Microservicio encargado de enviar alertas y notificaciones a ciudadanos, operadores y patrulleros del sistema CENTINELA (UNEMI).
 
 Este servicio actúa como el eslabón final de la cadena de detección de eventos críticos. Recibe alertas generadas por `ms-core` (vía NATS), consulta qué ciudadanos deben ser notificados y realiza los envíos a proveedores externos (Firebase Cloud Messaging y Telegram).
 
@@ -13,9 +15,10 @@ ms-core (Alerta detectada)
          1. NATS: usuario_zonas.get_users_by_zona (Busca destinatarios)
          2. NATS: usuarios.get_roles (Consulta a ms-auth los roles de los destinatarios)
          3. Envío según rol:
-            - Si es 'ciudadano' -> Firebase Cloud Messaging (FCM / App Móvil)
-            - Si es 'operador' o 'admin' -> OneSignal (Notificación Web)
-            - Telegram -> grupo operadores/policía + canal ciudadanos
+            - Ciudadano → FCM (app móvil)
+            - Operador / Admin → OneSignal (panel web)
+            - Policia → OneSignal (solo patrullero más cercano; fallback todos)
+            - Telegram → grupo staff + canal ciudadanos
          4. NATS: notificaciones.create (Guarda historial en BD)
 ```
 
@@ -50,7 +53,9 @@ En el archivo `.env` puedes configurar los tokens reales. Si no los tienes, el s
 - `TELEGRAM_CHAT_ID`: *(legacy)* fallback del grupo operativo si no defines `STAFF_GROUP_ID`.
 - `DASHBOARD_URL`: URL del panel web (enlaces en botones del grupo operativo).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`: Envío de correos transaccionales (verificación, recuperación de contraseña).
-- `PUBLIC_WEB_URL`: URL base del frontend para enlaces en emails.
+- `PUBLIC_WEB_URL`: URL base del frontend (enlaces reset/verificación panel).
+- `PUBLIC_API_URL`: URL del gateway (bridge reset app).
+- `APP_RESET_URL`: Deep link app (`centinela://reset-password`).
 
 > **Fotos y evidencia:** las imágenes de reportes y alertas se gestionan en `c-gateway` (Cloudinary) y `ms-core` (URLs en BD). Este servicio no adjunta imágenes a push/email; solo notifica el evento de alerta.
 
